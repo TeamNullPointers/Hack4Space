@@ -14,7 +14,9 @@ parser.read("config.txt")
 
 email = parser.get("config", "email")
 apikey = parser.get("config", "apikey")
-BASE = parser.get("config", "apiurl")
+apiurl = parser.get("config", "apiurl")
+
+TEST_URL = "https://aqs.epa.gov/data/api/list/classes?email=carrilloreb9@gmail.com&key=indigocat58&pc=ALL"
 
 # ==============================#
 #           CONSTANTS           #
@@ -22,8 +24,8 @@ BASE = parser.get("config", "apiurl")
 
 
 # URLS
-PARAM_ENDPOINT_URL = f"https://aqs.epa.gov/data/api/list/parametersByClass?email={email}&key={apikey}"
-COUNTY_ANNUAL_SUMMARY_URL = f"https://aqs.epa.gov/data/api/sampleData/byCounty?email={email}&key={apikey}&param={param}&bdate={bdate}&edate={edate}&state=06"
+#PARAM_ENDPOINT_URL = f"https://aqs.epa.gov/data/api/list/parametersByClass?email={email}&key={apikey}&pc=ALL"
+#COUNTY_ANNUAL_SUMMARY_URL = f"https://aqs.epa.gov/data/api/sampleData/byCounty?email={email}&key={apikey}&param={param}&bdate={bdate}&edate={edate}&state=06"
 
 # CODES
 
@@ -74,22 +76,27 @@ def home():
     return 'The API is up and running'
 
 
-@app.route('/param_codes', methods=['GET'])
-def list_params(filter_by=None):
+@app.route('/test', methods=['GET'])
+def test():
 
-    if filter_by:
-        url = PARAM_ENDPOINT_URL + f"&pc={filter_by}"
-    else:
-        url = PARAM_ENDPOINT_URL + "&pc=ALL"
-
-    r = requests.get(url)
-
-    return r.text
+    r = requests.get(TEST_URL)
+    return r.json()
 
 
+# @app.route('/param_codes', methods=['GET'])
+# def list_params(filter_by=None):
+#
+#     if filter_by:
+#         url = PARAM_ENDPOINT_URL + f"&pc={filter_by}"
+#     else:
+#         url = PARAM_ENDPOINT_URL + "&pc=ALL"
+#
+#     r = requests.get(url)
+#
+#     return r.text
 
 
-def __get_url_county_x_param(county, date_arg):
+def __get_url_county_x_param(county, param, date_arg):
     '''
     Get the url string uniue to a combo of county and date arg string
     :param county: county code
@@ -97,7 +104,9 @@ def __get_url_county_x_param(county, date_arg):
     :return: full url string for api GET request
     '''
 
-    url = BASE + date_arg + f"&state=06&county={county}"
+    base_url = ""
+
+    url = base_url + date_arg + f"&state=06&county={county}"
 
     return url
 
@@ -219,7 +228,7 @@ def get_annual_summary(request_endpoints):
 
     response = requests.get(request_endpoints)
 
-    return response.text
+    return response.json()
 
 
 
