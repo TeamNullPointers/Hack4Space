@@ -27,3 +27,8 @@ Right now we're doing global, may reduce to usa
   	- Humboldt Country (Eureka, Arcata)
 
   #### Pulling data from the IQ Air API
+
+
+  # Things People Could Do That Would Be Helpful
+
+   1. Write an argument for why California is a good representation of the overall issue of air quality 
