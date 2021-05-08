@@ -19,7 +19,7 @@ Right now we're doing global, may reduce to usa
 
  ## Case study: California
 
-  #### right now we're focusing on california for reasons. (list reasons here). We can expand later if we need to
+  #### right now we're focusing on california for reasons. (The state of California has a history of prioritizing environmental regulation and legislation, this provides a unique opportunity to study the effect of local laws on local air pollutant concentration outcomes (SO2, NOx, CO2, PM) has measured by satellite sensor arrays. Using a historical record of legislation (with which we assume compliance) we can observe the impact, if any, on real concentration outcomes folloiwng the implementation of such policies. What we learn about the legislative approach in the state of california can serve as a guide post for government and institutions elsewhere to drive meaningful  change in the future). We can expand later if we need to
   	- Los Angeles
   	- San Francisco
   	- San Diego
