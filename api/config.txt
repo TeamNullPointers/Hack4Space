@@ -1,0 +1,4 @@
+[CONFIG]
+email="carrilloreb9@gmail.com"
+apikey="indigocat"
+apiurl="https://aqs.epa.gov/data/api/"
