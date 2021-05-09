@@ -1,0 +1,16 @@
+Fuel Type,California,Percent of California,Northwest Imports (GWh),Southwest Imports (GWh),California Energy Mix (GWh),California Power Mix
+,In-State Generation (GWh),In-State Generation,,,,
+Coal,324,0.16%,373,"11,310","12,006",4.13%
+Large Hydro,"24,410",12.31%,"3,367","1,904","29,681",10.21%
+Natural Gas,"98,831",49.86%,41,"7,120","105,992",36.48%
+Nuclear,"18,931",9.55%,0,"7,739","26,670",9.18%
+Oil,37,0.02%,0,0,37,0.01%
+Other (Petroleum Coke/Waste Heat),394,0.20%,0,0,394,0.14%
+Renewables,"55,300",27.90%,"11,710","6,952","73,961",25.45%
+Biomass,"5,868",2.96%,659,25,"6,553",2.26%
+Geothermal,"11,582",5.84%,96,"1,038","12,717",4.38%
+Small Hydro,"4,567",2.30%,229,1,"4,796",1.65%
+Solar,"19,783",9.98%,0,"3,791","23,574",8.11%
+Wind,"13,500",6.81%,"10,725","2,097","26,321",9.06%
+Unspecified Sources of Power,N/A,N/A,"26,888","14,937","41,825",14.39%
+Total,"198,227",100.00%,"42,378","49,963","290,567",100.00%
