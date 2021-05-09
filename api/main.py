@@ -1,14 +1,14 @@
 from flask import Flask
-import asyncio
-from flask.ext.aiohttp import async
 from flask_restful import Resource, Api
 import requests
 import requests_cache
 import os
 import configparser
+from pathlib import Path
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
-aio = AioHTTP(app)
 
 
 requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180000)
@@ -108,46 +108,10 @@ def test():
 #     return r.text
 
 
-# ==================== #
-# BIGBOY ROUTES - fetch all (defined in readme)
-# cache these please    #
-# ==================== #
-
-@app.route('/annual/C02', methods=['GET'])
-@async
-def get_annual_summaries_CO2():
-    response = yield from aiohttp.request(
-        'GET',
-
-    )
-
-    param = "42101"
-    humboldt = COUNTIES["HUMBOLDT"]
-
-    url=f"https://aqs.epa.gov/data/api/sampleData/byCounty?email={email}&key={apikey}&param={param}" \
-        f"&bdate={bdate}&edate={edate}&state=06&county={humboldt}"
-
-
-
-
-# =========++++
-# HELPER FUNCTIONS ====
-
-def get_url_county_x_param(county, param, date_arg):
-    '''
-    Get the url string uniue to a combo of county and date arg string
-    :param county: county code
-    :param date_arg: formatted str
-    :return: full url string for api GET request
-    '''
-
-    base_url = ""
-
-    url = base_url + date_arg + f"&state=06&county={county}"
-
-    return url
-
-def __generate_date_args(param, start_year=None, end_year=None):
+# ===================== #
+# HELPER FUNCTIONS ==== #
+# ===================== #
+def generate_date_args(start_year=None, end_year=None):
 
     '''
     This just generates the correctly formatted date arg to pass.
@@ -157,129 +121,100 @@ def __generate_date_args(param, start_year=None, end_year=None):
     :return: array of strings
     '''
 
+    # We're actually only pulling to 2020 bc 2021 data isn't guaranteed yet
+
     if end_year:
         assert(end_year < 2021)
     else:
         end_year = 2021
 
     if start_year is None:
-        start_year = 2001
+        start_year = 1999
 
 
     diff = range(start_year, end_year)
     all_years = list(diff)
 
-    date_formatting_pattern: f"'010120{YY}'"
-    args = []
-    for y in all_years:
-        new_arg = date_formatting_pattern(YY=y)
-        args.append(new_arg)
+    # EPA enforces limit of year inclusive
+    start_year = "20{YY}0101"
+    end_year="20{YY}1231"
+
+    all_date_tuples = []
+    for YY in all_years:
+        date_args = (start_year.format(YY=YY), end_year.format(YY=YY))
+        all_date_tuples.append(date_args)
+
+    return all_date_tuples
 
 
-    full_args = []
-    for a in args:
-        add_to_arg = f"&param={param}&bdate={start_year}&edate={a}&state=06"
-        full_arg = BASE + add_to_arg
-        full_args.append(full_arg)
-
-    return full_args
-
-
-def pull_annual(all_requests_gen):
+def make_annual_urls(param):
     '''
-
-    :param all_requests_gen:
-    :return: array of objects (JSON response data)
-    '''
-
-    all_request_responses = []
-    for a in all_requests_gen:
-        response_body = get_annual_summary(a)
-        all_request_responses.append(response_body)
-
-    return all_request_responses
-
-
-def _generate_all_annual_requests_less_county(p_list = None,
-                                     bdate = None,
-                                     edate = None):
-
-    '''
-
-    :param p_list:
-    :param bdate:
-    :param edate:
+    dirty little hack for generating a list of urls for the thread
+    pool executor to hit up
+    :param param:
     :return: list of strings
     '''
-    if p_list:
-        ps = p_list
 
-    else:
-        ps = PARAM_LIST
+    # Consider throwing in date parameterization
+    date_args = generate_date_args()
+    base_url="https://aqs.epa.gov/data/api/annualData/byCounty?email=carrilloreb9@gmail.com&key=indigocat58"
+    param_snippet=f"&param={param}"
 
-    if bdate:
-        b = bdate
+    annual_urls = []
 
-    else:
-        b = "19990101"
+    for c in COUNTIES.values():
+        county_filter_snippet = f"&county={c}"
+        for a, b in date_args:
+            date_snippet=f"&bdate={a}&edate={b}1&state=06"
+            full_url= base_url + param_snippet + date_snippet + county_filter_snippet
+            annual_urls.append(full_url)
 
-    if edate:
-        e = edate
-    else:
-        e = "20210101"
-
-
-    # I am sincerely sorry for the heinous amount of for loops in this software but hey, hack, right?
+    return make_annual_urls()
 
 
-    almost_full_urls = []
-    for p in ps:
-        url_slice = f"&param={p}&bdate={b}&edate={e}"
-        full_url_less_county = BASE + url_slice
-        almost_full_urls.append(full_url_less_county)
+def get_annual_summary_CO2(url):
 
-    return almost_full_urls
+    '''
+    get one year C02 annual summary for one county
+    :param url:
+    :return: json
+    '''
 
+    req = urllib.request.urlopen(url)
+    fullpath = Path(url)
+    fname = fullpath.name
+    ext = fullpath.suffix
 
-def _generate_all_annual_requests(a_list):
+    if not ext:
+        raise RuntimeError("URL does not contain an extension")
 
-    request_endpoints = []
-    for a in a_list:
-        for c in COUNTY_LIST:
-            url = a + f"&county={c}"
-            request_endpoints.append(url)
+    with open(fname, "wb") as handle:
+        while True:
+            chunk = req.read(1024)
+            if not chunk:
+                break
+            handle.write(chunk)
 
-    return request_endpoints
-
-
-
-
-
-# WRAPPER TO GET ALL ANNUAL REPORTS - USE SPARINGLY
-
-# @TODO: when I get back from break - implement async io logic stuff to do all annual gets at once(threaded)
-# relies on client session apparently
-
-@app.route('/do_annual')
-def get_annual_summary(request_endpoints):
-
-    response = requests.get(request_endpoints)
-
-    return response.json()
+    msg = f"Finished downloading {fname}"
+    return msg
 
 
+# ==================== #
+# BIGBOY ROUTES - fetch all (defined in readme)
+# cache these please    #
+# ==================== #
 
-# # Pull all annual reports from the counties in our county list
-# # pass specific param
-# @app.route('annual_all/<int:param code>')
-# def pull_county_annuals(p):
-#
-#     responses = []
-#     for c in COUNTY_LIST:
-#         county=c
-#         param=p
-#         r = requests.get(COUNTY_ANNUAL_SUMMARY_URL+f"&county={county}")
+@timeit
+@app.route('/annual/C02)')
+def download_all_C02(carbon_urls=None):
+
+    if carbon_urls is None:
+        carbon_urls = make_annual_urls("42101")
+
+    with ThreadPoolExecutor(max_workers=13) as executor:
+            return executor.map(get_annual_summary_CO2, carbon_urls, timeout=60)
+
 
 
 if __name__ == '__main__':
-    aio.run(app)
+    app.run(app)
