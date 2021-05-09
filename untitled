@@ -1,0 +1,20 @@
+
+
+Code,value_represented
+"42101","Carbon monoxide"
+"42401","Sulfur dioxide"
+"42602","Nitrogen dioxide (NO2)"
+"44201","Ozone"
+"81102","PM10 Total 0-10um STP"
+"88101","PM2.5 - Local Conditions"
+"88502","Acceptable PM2.5 AQI & Speciation Mass"
+"12403","Sulfate (TSP) STP"
+"43102","Total NMOC (non-methane organic compound)"
+"62101","Outdoor Temperature"
+"63301","Solar radiation"
+"64101","Barometric pressure"
+"65102","Rain/melt precipitation"
+"81102","PM10 Total 0-10um STP"
+"85101","PM10 - LC"
+"86101","PM10-2.5 - Local Conditions"
+"86502","Acceptable PM10-2.5 - Local Conditions"
