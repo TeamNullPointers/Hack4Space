@@ -1,4 +1,6 @@
-from flask import Flask,request,jsonify
+from flask import Flask
+import asyncio
+from flask.ext.aiohttp import async
 from flask_restful import Resource, Api
 import requests
 import requests_cache
@@ -6,8 +8,10 @@ import os
 import configparser
 
 app = Flask(__name__)
+aio = AioHTTP(app)
 
-requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180)
+
+requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180000)
 
 parser = configparser.ConfigParser()
 parser.read("config.txt")
@@ -16,7 +20,7 @@ email = parser.get("config", "email")
 apikey = parser.get("config", "apikey")
 apiurl = parser.get("config", "apiurl")
 
-TEST_URL = "https://aqs.epa.gov/data/api/list/classes?email=carrilloreb9@gmail.com&key=indigocat58&pc=ALL"
+TEST_URL = "https://aqs.epa.gov/data/api/list/classes?email=carrilloreb9@gmail.com&key=indigocat58"
 
 # ==============================#
 #           CONSTANTS           #
@@ -38,7 +42,13 @@ STATE = '06'
 # 	San Diego: 073
 # 	Sacramento: 067
 
-COUNTY_LIST = ['023','037','075','073','067']
+COUNTIES = {"HUMBOLDT": "023",
+            "LA": "037",
+            "SF": "075",
+            "SD": "073",
+            "SACRAMENTO": "067"}
+
+
 
 # Parameters
 # ------------
@@ -65,16 +75,18 @@ COUNTY_LIST = ['023','037','075','073','067']
 PARAM_LIST = ["42101", "42401","42602","44201", "62101", "65102", "811202","86101", "86502",
 "88101","88502"]
 
+DATE_RANGE = (19990101, 20201231)
 
 # ============================== #
 #           ROUTES               #
 # ============================== #
 
-
 @app.route('/', methods=['GET'])
 def home():
+
     return 'The API is up and running'
 
+# Test api is working
 
 @app.route('/test', methods=['GET'])
 def test():
@@ -96,7 +108,32 @@ def test():
 #     return r.text
 
 
-def __get_url_county_x_param(county, param, date_arg):
+# ==================== #
+# BIGBOY ROUTES - fetch all (defined in readme)
+# cache these please    #
+# ==================== #
+
+@app.route('/annual/C02', methods=['GET'])
+@async
+def get_annual_summaries_CO2():
+    response = yield from aiohttp.request(
+        'GET',
+
+    )
+
+    param = "42101"
+    humboldt = COUNTIES["HUMBOLDT"]
+
+    url=f"https://aqs.epa.gov/data/api/sampleData/byCounty?email={email}&key={apikey}&param={param}" \
+        f"&bdate={bdate}&edate={edate}&state=06&county={humboldt}"
+
+
+
+
+# =========++++
+# HELPER FUNCTIONS ====
+
+def get_url_county_x_param(county, param, date_arg):
     '''
     Get the url string uniue to a combo of county and date arg string
     :param county: county code
@@ -232,12 +269,6 @@ def get_annual_summary(request_endpoints):
 
 
 
-
-
-
-
-
-
 # # Pull all annual reports from the counties in our county list
 # # pass specific param
 # @app.route('annual_all/<int:param code>')
@@ -248,3 +279,7 @@ def get_annual_summary(request_endpoints):
 #         county=c
 #         param=p
 #         r = requests.get(COUNTY_ANNUAL_SUMMARY_URL+f"&county={county}")
+
+
+if __name__ == '__main__':
+    aio.run(app)
