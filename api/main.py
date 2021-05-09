@@ -1,24 +1,26 @@
 from flask import Flask
-from flask_restful import Resource, Api
 import requests
 import requests_cache
-import os
 import configparser
+import time
 from pathlib import Path
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
 
+#requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180)
 
-requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180000)
+# parser = configparser.ConfigParser()
+# parser.read("config.txt")
+#
+# email = parser.get("Default", "Email")
+# apikey = parser.get("Default", "Apikey")
+# apiurl = parser.get("Default", "Apiurl")
 
-parser = configparser.ConfigParser()
-parser.read("config.txt")
-
-email = parser.get("config", "email")
-apikey = parser.get("config", "apikey")
-apiurl = parser.get("config", "apiurl")
+# I know it's heinous to have these in the script, troubleshooting
+email="carrilloreb9@gmail.com"
+apikey="indigocat58"
 
 TEST_URL = "https://aqs.epa.gov/data/api/list/classes?email=carrilloreb9@gmail.com&key=indigocat58"
 
@@ -84,7 +86,7 @@ DATE_RANGE = (19990101, 20201231)
 @app.route('/', methods=['GET'])
 def home():
 
-    return 'The API is up and running'
+    return "<h1 style='color:blue'>We got ourselves an API!</h1>"
 
 # Test api is working
 
@@ -136,8 +138,8 @@ def generate_date_args(start_year=None, end_year=None):
     all_years = list(diff)
 
     # EPA enforces limit of year inclusive
-    start_year = "20{YY}0101"
-    end_year="20{YY}1231"
+    start_year = "{YY}0101"
+    end_year="{YY}1231"
 
     all_date_tuples = []
     for YY in all_years:
@@ -157,19 +159,19 @@ def make_annual_urls(param):
 
     # Consider throwing in date parameterization
     date_args = generate_date_args()
-    base_url="https://aqs.epa.gov/data/api/annualData/byCounty?email=carrilloreb9@gmail.com&key=indigocat58"
-    param_snippet=f"&param={param}"
+    base_url = "https://aqs.epa.gov/data/api/annualData/byCounty?email=carrilloreb9@gmail.com&key=indigocat58"
+    param_snippet = "&param={param}".format(param=param)
 
     annual_urls = []
 
     for c in COUNTIES.values():
-        county_filter_snippet = f"&county={c}"
+        county_filter_snippet = "&county={c}".format(c=c)
         for a, b in date_args:
-            date_snippet=f"&bdate={a}&edate={b}1&state=06"
+            date_snippet="&bdate={a}&edate={b}&state=06".format(a=a, b=b)
             full_url= base_url + param_snippet + date_snippet + county_filter_snippet
             annual_urls.append(full_url)
 
-    return make_annual_urls()
+    return annual_urls
 
 
 def get_annual_summary_CO2(url):
@@ -195,26 +197,55 @@ def get_annual_summary_CO2(url):
                 break
             handle.write(chunk)
 
-    msg = f"Finished downloading {fname}"
+    msg = "Finished downloading {fname}".fname(fname=fname)
     return msg
 
 
 # ==================== #
-# BIGBOY ROUTES - fetch all (defined in readme)
+# BIG ROUTES - fetch all (defined in readme)
 # cache these please    #
 # ==================== #
-
-@timeit
-@app.route('/annual/C02)')
 def download_all_C02(carbon_urls=None):
 
     if carbon_urls is None:
         carbon_urls = make_annual_urls("42101")
 
+    futures_list = []
+    results = []
+
     with ThreadPoolExecutor(max_workers=13) as executor:
-            return executor.map(get_annual_summary_CO2, carbon_urls, timeout=60)
+        for url in carbon_urls:
+            print(url)
+            futures = executor.submit(do_CO2_download, url)
+            futures_list.append(futures)
+
+        for future in futures_list:
+            try:
+                result = future.result(timeout=60)
+                results.append(result)
+            except Exception:
+                print("yikes")
+                results.append({"status":"500", "data":"yikes"})
+
+    return results
+
+
+
+app.route('/annual/C02')
+def do_C02_download():
+    carbon_urls = make_annual_urls("42101")
+    print(carbon_urls)
+    results = download_all_C02(carbon_urls)
+    for result in results:
+        print(result)
+
+
+
+
 
 
 
 if __name__ == '__main__':
-    app.run(app)
+    app.run(host='0.0.0.0')
+
+
