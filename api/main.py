@@ -5,11 +5,11 @@ import configparser
 import time
 from pathlib import Path
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
-#requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180)
+# requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180)
 
 # parser = configparser.ConfigParser()
 # parser.read("config.txt")
@@ -28,28 +28,15 @@ TEST_URL = "https://aqs.epa.gov/data/api/list/classes?email=carrilloreb9@gmail.c
 #           CONSTANTS           #
 # ==============================#
 
-
-# URLS
-#PARAM_ENDPOINT_URL = f"https://aqs.epa.gov/data/api/list/parametersByClass?email={email}&key={apikey}&pc=ALL"
-#COUNTY_ANNUAL_SUMMARY_URL = f"https://aqs.epa.gov/data/api/sampleData/byCounty?email={email}&key={apikey}&param={param}&bdate={bdate}&edate={edate}&state=06"
-
 # CODES
 
 STATE = '06'
-
-# COUNTIES
-# 	Humboldt County: 023
-# 	Los Angeles: 037
-# 	San Francisco: 075
-# 	San Diego: 073
-# 	Sacramento: 067
 
 COUNTIES = {"HUMBOLDT": "023",
             "LA": "037",
             "SF": "075",
             "SD": "073",
             "SACRAMENTO": "067"}
-
 
 
 # Parameters
@@ -74,111 +61,22 @@ COUNTIES = {"HUMBOLDT": "023",
 # "86502","Acceptable PM10-2.5 - Local Conditions"
 
 
-PARAM_LIST = ["42101", "42401","42602","44201", "62101", "65102", "811202","86101", "86502",
-"88101","88502"]
+PARAM_LIST = ["42101", "42401","42602","44201", "62101",
+              "65102", "811202","86101", "86502",
+              "88101","88502"]
 
 DATE_RANGE = (19990101, 20201231)
 
-# ============================== #
-#           ROUTES               #
-# ============================== #
 
-@app.route('/', methods=['GET'])
-def home():
+# ======================== #
+# ===HELPER FUNCTIONS ==== #
+# ======================== #
 
-    return "<h1 style='color:blue'>We got ourselves an API!</h1>"
-
-# Test api is working
-
-@app.route('/test', methods=['GET'])
-def test():
-
-    r = requests.get(TEST_URL)
-    return r.json()
-
-
-# @app.route('/param_codes', methods=['GET'])
-# def list_params(filter_by=None):
-#
-#     if filter_by:
-#         url = PARAM_ENDPOINT_URL + f"&pc={filter_by}"
-#     else:
-#         url = PARAM_ENDPOINT_URL + "&pc=ALL"
-#
-#     r = requests.get(url)
-#
-#     return r.text
-
-
-# ===================== #
-# HELPER FUNCTIONS ==== #
-# ===================== #
-def generate_date_args(start_year=None, end_year=None):
-
-    '''
-    This just generates the correctly formatted date arg to pass.
-    Years start on Jan 1
-    :param start_year: YY (e.g. 2001 = 01)
-    :param end_year: YY (max 21)
-    :return: array of strings
-    '''
-
-    # We're actually only pulling to 2020 bc 2021 data isn't guaranteed yet
-
-    if end_year:
-        assert(end_year < 2021)
-    else:
-        end_year = 2021
-
-    if start_year is None:
-        start_year = 1999
-
-
-    diff = range(start_year, end_year)
-    all_years = list(diff)
-
-    # EPA enforces limit of year inclusive
-    start_year = "{YY}0101"
-    end_year="{YY}1231"
-
-    all_date_tuples = []
-    for YY in all_years:
-        date_args = (start_year.format(YY=YY), end_year.format(YY=YY))
-        all_date_tuples.append(date_args)
-
-    return all_date_tuples
-
-
-def make_annual_urls(param):
-    '''
-    dirty little hack for generating a list of urls for the thread
-    pool executor to hit up
-    :param param:
-    :return: list of strings
-    '''
-
-    # Consider throwing in date parameterization
-    date_args = generate_date_args()
-    base_url = "https://aqs.epa.gov/data/api/annualData/byCounty?email=carrilloreb9@gmail.com&key=indigocat58"
-    param_snippet = "&param={param}".format(param=param)
-
-    annual_urls = []
-
-    for c in COUNTIES.values():
-        county_filter_snippet = "&county={c}".format(c=c)
-        for a, b in date_args:
-            date_snippet="&bdate={a}&edate={b}&state=06".format(a=a, b=b)
-            full_url= base_url + param_snippet + date_snippet + county_filter_snippet
-            annual_urls.append(full_url)
-
-    return annual_urls
-
-
-def get_annual_summary_CO2(url):
-
+def get_one_annual_summary(url):
     '''
     get one year C02 annual summary for one county
     :param url:
+    :param year:
     :return: json
     '''
 
@@ -201,48 +99,114 @@ def get_annual_summary_CO2(url):
     return msg
 
 
-# ==================== #
-# BIG ROUTES - fetch all (defined in readme)
-# cache these please    #
-# ==================== #
-def download_all_C02(carbon_urls=None):
+# date-range related
+def generate_date_args(start_year=None, end_year=None):
+    '''
+    This just generates the correctly formatted date arg to pass.
+    Years start on Jan 1
+    :param start_year: YY (e.g. 2001 = 01)
+    :param end_year: YY (max 21)
+    :return: array of strings
+    '''
 
-    if carbon_urls is None:
-        carbon_urls = make_annual_urls("42101")
+    # We're actually only pulling to 2020 bc 2021 data isn't guaranteed yet
+
+    if end_year:
+        assert (end_year < 2021)
+    else:
+        end_year = 2021
+
+    if start_year is None:
+        start_year = 1999
+
+    diff = range(start_year, end_year)
+    all_years = list(diff)
+
+    # EPA enforces limit of year inclusive
+    start_year = "{YY}0101"
+    end_year = "{YY}1231"
+
+    all_date_tuples = []
+    for YY in all_years:
+        date_args = (start_year.format(YY=YY), end_year.format(YY=YY))
+        all_date_tuples.append(date_args)
+
+    return all_date_tuples
+
+
+def make_urls(param, report_type=None):
+    """
+    dirty little hack for generating a list of urls for the thread
+    pool executor to hit up
+    :param param:
+    :param report_type: str describing which report endpoint to hit, e.g Sample Data
+    :return: list of strings
+    """
+    date_args = generate_date_args()
+
+    if report_type is None:
+        report_type = "sampleData"
+
+    base_url = "https://aqs.epa.gov/data/api/{report_type}" \
+               "byCounty?email=carrilloreb9@gmail.com&key=indigocat58".format(report_type=report_type)
+    param_snippet = "&param={param}".format(param=param)
+
+    all_urls = []
+
+    for c in COUNTIES.values():
+        county_filter_snippet = "&county={c}".format(c=c)
+        for a, b in date_args:
+            date_snippet = "&bdate={a}&edate={b}&state=06".format(a=a, b=b)
+            full_url = base_url + param_snippet + date_snippet + county_filter_snippet
+            all_urls.append(full_url)
+
+    return all_urls
+
+# ============================== #
+#           ROUTES               #
+# ============================== #
+
+
+@app.route('/', methods=['GET'])
+def home():
+
+    return "<h1 style='color:blue'>We got ourselves an API!</h1>"
+
+# Test api is working
+
+
+@app.route('/test', methods=['GET'])
+def test():
+
+    r = requests.get(TEST_URL)
+    return r.json()
+
+
+@app.route('/annual', methods=['GET'])
+def download_all(param, urls=None):
+
+    if urls is None:
+        urls = make_urls(param)
 
     futures_list = []
     results = []
 
     with ThreadPoolExecutor(max_workers=13) as executor:
-        for url in carbon_urls:
-            print(url)
-            futures = executor.submit(do_CO2_download, url)
+        for url in urls:
+            futures = executor.submit(get_one_annual_summary, url)
             futures_list.append(futures)
 
         for future in futures_list:
             try:
                 result = future.result(timeout=60)
-                results.append(result)
+                results.append({"status":"200", "data": result})
             except Exception:
                 print("yikes")
-                results.append({"status":"500", "data":"yikes"})
+                results.append({"status" : "500", "data":"yikes"})
 
-    return results
+    response = {"status": "200", "data": results}
 
-
-
-app.route('/annual/C02')
-def do_C02_download():
-    carbon_urls = make_annual_urls("42101")
-    print(carbon_urls)
-    results = download_all_C02(carbon_urls)
-    for result in results:
-        print(result)
-
-
-
-
-
+    return response
 
 
 if __name__ == '__main__':
