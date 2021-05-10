@@ -5,6 +5,7 @@ import configparser
 import time
 from pathlib import Path
 import urllib.request
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
@@ -134,7 +135,7 @@ def generate_date_args(start_year=None, end_year=None):
     return all_date_tuples
 
 
-def make_urls(param, report_type=None):
+def make_urls(param=None, report_type=None):
     """
     dirty little hack for generating a list of urls for the thread
     pool executor to hit up
@@ -145,7 +146,11 @@ def make_urls(param, report_type=None):
     date_args = generate_date_args()
 
     if report_type is None:
-        report_type = "sampleData"
+        report_type = "annualData"
+
+    # Defaulting to carbon emissions because that's the most common
+    if param is None:
+        param = 42101
 
     base_url = "https://aqs.epa.gov/data/api/{report_type}" \
                "byCounty?email=carrilloreb9@gmail.com&key=indigocat58".format(report_type=report_type)
@@ -165,6 +170,29 @@ def make_urls(param, report_type=None):
 # ============================== #
 #           ROUTES               #
 # ============================== #
+# Route definitions and threading logic
+
+# Threading logic
+
+
+thread_local = threading.local()
+
+
+def get_session():
+    if not hasattr(thread_local, "session"):
+        thread_local.session = requests.Session()
+    return thread_local.session
+
+
+def download_site(url):
+    session = get_session()
+    with session.get(url) as response:
+        print(f"Read {len(response.content)} from {url}")
+
+
+def download_all_sites(sites):
+    with ThreadPoolExecutor(max_workers=13) as executor:
+        executor.map(download_site, sites)
 
 
 @app.route('/', methods=['GET'])
@@ -183,7 +211,7 @@ def test():
 
 
 @app.route('/annual', methods=['GET'])
-def download_all(param, urls=None):
+def download_all_annual(param, urls=None):
 
     if urls is None:
         urls = make_urls(param)
@@ -210,6 +238,11 @@ def download_all(param, urls=None):
 
 
 if __name__ == '__main__':
+    urls = make_urls()
+    start_time = time.time()
+    download_all_annual(urls)
+    duration = time.time() - start_time
+    print(f"Called {len(urls)} api endpoints in {duration} seconds")
     app.run(host='0.0.0.0')
 
 
