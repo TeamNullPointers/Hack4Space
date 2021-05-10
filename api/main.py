@@ -5,7 +5,7 @@ import configparser
 import time
 from pathlib import Path
 import urllib.request
-import threading
+import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
@@ -167,32 +167,32 @@ def make_urls(param=None, report_type=None):
 
     return all_urls
 
+
+# MULTI-THREADING LOGIC
+
+session = None
+
+
+def set_global_session():
+    global session
+    if not session:
+        session = requests.Session()
+
+
+def download_url(url):
+    with session.get(url) as response:
+        name = multiprocessing.current_process().name
+        print(f"{name}:Read {len(response.content)} from {url}")
+
+
+def download_all_urls(urls):
+    with multiprocessing.Pool(initializer=set_global_session) as pool:
+        pool.map(download_url, urls)
+
+
 # ============================== #
 #           ROUTES               #
 # ============================== #
-# Route definitions and threading logic
-
-# Threading logic
-
-
-thread_local = threading.local()
-
-
-def get_session():
-    if not hasattr(thread_local, "session"):
-        thread_local.session = requests.Session()
-    return thread_local.session
-
-
-def download_site(url):
-    session = get_session()
-    with session.get(url) as response:
-        print(f"Read {len(response.content)} from {url}")
-
-
-def download_all_sites(sites):
-    with ThreadPoolExecutor(max_workers=13) as executor:
-        executor.map(download_site, sites)
 
 
 @app.route('/', methods=['GET'])
@@ -214,27 +214,9 @@ def test():
 def download_all_annual(param, urls=None):
 
     if urls is None:
-        urls = make_urls(param)
+        urls = make_urls(param, "annual")
 
-    futures_list = []
-    results = []
-
-    with ThreadPoolExecutor(max_workers=13) as executor:
-        for url in urls:
-            futures = executor.submit(get_one_annual_summary, url)
-            futures_list.append(futures)
-
-        for future in futures_list:
-            try:
-                result = future.result(timeout=60)
-                results.append({"status":"200", "data": result})
-            except Exception:
-                print("yikes")
-                results.append({"status" : "500", "data":"yikes"})
-
-    response = {"status": "200", "data": results}
-
-    return response
+    download_all_urls(urls)
 
 
 if __name__ == '__main__':
