@@ -1,19 +1,18 @@
 from flask import Flask
-import requests
 import requests_cache
 import configparser
-import time
 from pathlib import Path
-import urllib.request
-import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
+import requests
+import uuid
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
 
 # requests_cache.install_cache('epa_cache', backend='sqlite', expire_after=180)
 
-# parser = configparser.ConfigParser()
-# parser.read("config.txt")
+parser = configparser.ConfigParser()
+parser.read("config.txt")
 #
 # email = parser.get("Default", "Email")
 # apikey = parser.get("Default", "Apikey")
@@ -24,6 +23,7 @@ email="carrilloreb9@gmail.com"
 apikey="indigocat58"
 
 TEST_URL = "https://aqs.epa.gov/data/api/list/classes?email=carrilloreb9@gmail.com&key=indigocat58"
+
 
 # ==============================#
 #           CONSTANTS           #
@@ -72,32 +72,6 @@ DATE_RANGE = (19990101, 20201231)
 # ======================== #
 # ===HELPER FUNCTIONS ==== #
 # ======================== #
-
-def get_one_annual_summary(url):
-    '''
-    get one year C02 annual summary for one county
-    :param url:
-    :param year:
-    :return: json
-    '''
-
-    req = urllib.request.urlopen(url)
-    fullpath = Path(url)
-    fname = fullpath.name
-    ext = fullpath.suffix
-
-    if not ext:
-        raise RuntimeError("URL does not contain an extension")
-
-    with open(fname, "wb") as handle:
-        while True:
-            chunk = req.read(1024)
-            if not chunk:
-                break
-            handle.write(chunk)
-
-    msg = "Finished downloading {fname}".fname(fname=fname)
-    return msg
 
 
 # date-range related
@@ -150,44 +124,46 @@ def make_urls(param=None, report_type=None):
 
     # Defaulting to carbon emissions because that's the most common
     if param is None:
-        param = 42101
+        param = "42101"
 
     base_url = "https://aqs.epa.gov/data/api/{report_type}" \
-               "byCounty?email=carrilloreb9@gmail.com&key=indigocat58".format(report_type=report_type)
+               "/byState?email=carrilloreb9@gmail.com&key=indigocat58".format(report_type=report_type)
     param_snippet = "&param={param}".format(param=param)
 
     all_urls = []
 
-    for c in COUNTIES.values():
-        county_filter_snippet = "&county={c}".format(c=c)
-        for a, b in date_args:
-            date_snippet = "&bdate={a}&edate={b}&state=06".format(a=a, b=b)
-            full_url = base_url + param_snippet + date_snippet + county_filter_snippet
-            all_urls.append(full_url)
+    for a, b in date_args:
+        date_snippet = "&bdate={a}&edate={b}&state=06".format(a=a, b=b)
+        full_url = base_url + param_snippet + date_snippet
+        all_urls.append(full_url)
 
     return all_urls
 
 
-# MULTI-THREADING LOGIC
+def download_file(url, file_name):
+    try:
+        data = requests.get(url)
+        with open(file_name, mode='wb') as localfile:
+            localfile.write(data.content)
 
-session = None
+    except:
 
-
-def set_global_session():
-    global session
-    if not session:
-        session = requests.Session()
-
-
-def download_url(url):
-    with session.get(url) as response:
-        name = multiprocessing.current_process().name
-        print(f"{name}:Read {len(response.content)} from {url}")
+        return data
 
 
-def download_all_urls(urls):
-    with multiprocessing.Pool(initializer=set_global_session) as pool:
-        pool.map(download_url, urls)
+def runner(urls):
+    threads = []
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        for url in urls:
+            file_name = uuid.uuid1()
+            threads.append(executor.submit(download_file, url, file_name))
+        for task in as_completed(threads):
+            print(task.result())
+
+
+def pull_all(urls):
+    print("attempting to pull files")
+    runner(urls)
 
 
 # ============================== #
@@ -214,17 +190,21 @@ def test():
 def download_all_annual(param, urls=None):
 
     if urls is None:
-        urls = make_urls(param, "annual")
+        urls = make_urls(param, "annualData")
 
-    download_all_urls(urls)
+    pull_all(urls)
+
+
+@app.route('/sample', methods=['GET'])
+def download_all_sample(param, urls=None):
+
+    if urls is None:
+        urls = make_urls(param, "sampleData")
+
+    pull_all(urls)
 
 
 if __name__ == '__main__':
-    urls = make_urls()
-    start_time = time.time()
-    download_all_annual(urls)
-    duration = time.time() - start_time
-    print(f"Called {len(urls)} api endpoints in {duration} seconds")
     app.run(host='0.0.0.0')
 
 
